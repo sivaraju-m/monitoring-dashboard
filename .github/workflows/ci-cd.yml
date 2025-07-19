@@ -1,0 +1,311 @@
+name: Monitoring Dashboard CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run health checks daily at 9:00 AM UTC
+    - cron: '0 9 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, 3.10, 3.11]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Install test dependencies
+      run: |
+        pip install pytest pytest-cov pytest-asyncio
+        pip install flake8 black isort mypy
+
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 src/ bin/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 src/ bin/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+    - name: Format check with black
+      run: |
+        black --check --diff src/ bin/
+
+    - name: Import sort check with isort
+      run: |
+        isort --check-only --diff src/ bin/
+
+    - name: Type check with mypy
+      run: |
+        mypy src/ || true  # Don't fail on type errors for now
+
+    - name: Test with pytest
+      run: |
+        pytest tests/ -v --cov=monitoring_dashboard --cov-report=xml --cov-report=html
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    services:
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Create test configuration
+      run: |
+        mkdir -p config data logs reports
+        cp config/dashboard_config.yaml config/test_config.yaml
+
+    - name: Test dashboard server startup
+      run: |
+        timeout 30 python bin/dashboard_server.py --port 8001 &
+        sleep 10
+        curl -f http://localhost:8001/api/health || exit 1
+        pkill -f dashboard_server.py
+
+    - name: Test alert manager
+      run: |
+        python bin/alert_manager.py --test
+
+    - name: Test report generator
+      run: |
+        python bin/report_generator.py --type daily --output reports/test_report.json
+        test -f reports/test_report.json
+
+    - name: Test metrics collection
+      run: |
+        python -c "
+        from monitoring_dashboard.monitoring.metrics_collector import MetricsCollector
+        import asyncio
+        collector = MetricsCollector()
+        metrics = asyncio.run(collector.get_current_metrics())
+        assert 'timestamp' in metrics
+        print('✓ Metrics collection test passed')
+        "
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: [test, integration-test]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          aitradingmachine/monitoring-dashboard:latest
+          aitradingmachine/monitoring-dashboard:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  health-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Run system health check
+      run: |
+        python -c "
+        from monitoring_dashboard.monitoring.metrics_collector import MetricsCollector
+        from monitoring_dashboard.alerts.alert_manager import AlertManager
+        import asyncio
+        
+        async def health_check():
+            collector = MetricsCollector()
+            alert_manager = AlertManager()
+            
+            # Test metrics collection
+            metrics = await collector.get_current_metrics()
+            print(f'✓ Metrics collected: {len(metrics)} items')
+            
+            # Test alert system
+            await alert_manager.create_alert(
+                'Health Check', 'low', 'Automated health check', 'github_actions'
+            )
+            print('✓ Alert system working')
+            
+            # Test report generation
+            from monitoring_dashboard.reports.performance_reporter import PerformanceReporter
+            reporter = PerformanceReporter()
+            report = await reporter.generate_daily_report()
+            print(f'✓ Report generated: {report.get(\"report_date\", \"unknown\")}')
+            
+            return True
+        
+        result = asyncio.run(health_check())
+        print('🟢 All health checks passed' if result else '🔴 Health checks failed')
+        "
+
+    - name: Create health check issue on failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 Monitoring Dashboard Health Check Failed',
+            body: `
+            ## Health Check Failure
+            
+            The scheduled health check for the monitoring dashboard failed.
+            
+            **Workflow:** ${{ github.workflow }}
+            **Run ID:** ${{ github.run_id }}
+            **Timestamp:** ${{ github.event.head_commit.timestamp }}
+            
+            Please investigate the monitoring dashboard system.
+            `,
+            labels: ['bug', 'health-check', 'monitoring']
+          })
+
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+        pip install locust
+
+    - name: Run performance tests
+      run: |
+        # Start dashboard server
+        python bin/dashboard_server.py --port 8002 &
+        sleep 10
+        
+        # Create simple load test
+        cat > locustfile.py << 'EOF'
+        from locust import HttpUser, task, between
+        
+        class DashboardUser(HttpUser):
+            wait_time = between(1, 3)
+            
+            @task
+            def health_check(self):
+                self.client.get("/api/health")
+            
+            @task
+            def dashboard_data(self):
+                self.client.get("/api/dashboard-data")
+        EOF
+        
+        # Run load test
+        locust -f locustfile.py --headless --users 10 --spawn-rate 2 \
+               --host http://localhost:8002 --run-time 30s --html performance_report.html
+        
+        # Kill dashboard server
+        pkill -f dashboard_server.py
+
+    - name: Upload performance report
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-report
+        path: performance_report.html
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [test, integration-test, build-and-deploy]
+    if: always()
+
+    steps:
+    - name: Notify on success
+      if: needs.test.result == 'success' && needs.integration-test.result == 'success'
+      run: |
+        echo "✅ Monitoring Dashboard CI/CD completed successfully"
+        # Add Slack notification here if webhook is configured
+
+    - name: Notify on failure
+      if: needs.test.result == 'failure' || needs.integration-test.result == 'failure'
+      run: |
+        echo "❌ Monitoring Dashboard CI/CD failed"
+        # Add Slack notification here if webhook is configured
+        exit 1

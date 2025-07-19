@@ -1,0 +1,46 @@
+{
+  "report_date": "2025-07-19",
+  "generation_time": "2025-07-19T11:40:33.606315",
+  "summary": {
+    "total_pnl": 0.0,
+    "total_trades": 0,
+    "total_signals": 0,
+    "active_strategies": 0,
+    "win_rate": 0.0,
+    "best_strategy": "N/A",
+    "worst_strategy": "N/A",
+    "status": "operational"
+  },
+  "strategy_performance": {
+    "active_strategies": 0,
+    "total_signals": 0,
+    "daily_pnl": 0.0,
+    "weekly_pnl": 0.0,
+    "win_rate": 0.0,
+    "strategies": []
+  },
+  "trading_performance": {
+    "total_trades": 0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "daily_pnl": 0.0,
+    "total_pnl": 0.0,
+    "max_drawdown": 0.0,
+    "sharpe_ratio": 0.0,
+    "positions": []
+  },
+  "system_health": {
+    "uptime": "99.5%",
+    "memory_usage": 70.2,
+    "cpu_usage": 5.6,
+    "disk_usage": 5.4,
+    "data_quality": "good",
+    "last_data_update": "2025-07-19T11:40:32.593008",
+    "errors_count": 0,
+    "warnings_count": 2
+  },
+  "recommendations": [
+    "Win rate is below optimal threshold. Review strategy parameters.",
+    "Low trading activity detected. Check market conditions and strategy triggers."
+  ]
+}

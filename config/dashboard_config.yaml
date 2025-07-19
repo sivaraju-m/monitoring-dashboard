@@ -1,0 +1,105 @@
+# Dashboard Configuration - Production
+server:
+  host: "0.0.0.0"
+  port: 8080
+  debug: false
+  cors_enabled: true
+  cors_origins: ["https://*.run.app", "https://*.googleapis.com"]
+
+# Metrics Collection Settings
+metrics:
+  update_interval: 30  # seconds
+  history_days: 30
+  collection_timeout: 10  # seconds
+  max_data_points: 1000
+  
+  # Data sources - Production URLs from environment variables
+  sources:
+    strategy_engine:
+      url: "${STRATEGY_ENGINE_URL}/api/metrics"
+      enabled: true
+      timeout: 5
+    
+    trading_engine:
+      url: "${TRADING_EXECUTION_ENGINE_URL}/api/metrics"
+      enabled: true
+      timeout: 5
+    
+    data_pipeline:
+      url: "${TRADING_DATA_PIPELINE_URL}/api/metrics"
+      enabled: true
+      timeout: 5
+
+# Alert Configuration
+alerts:
+  max_alerts: 100
+  retention_days: 7
+  check_interval: 60  # seconds
+  
+  # Notification settings
+  notifications:
+    email:
+      enabled: false
+      smtp_server: ""
+      smtp_port: 587
+      username: ""
+      password: ""
+      recipients: []
+    
+    slack:
+      enabled: false
+      webhook_url: ""
+      channel: "#trading-alerts"
+
+# Dashboard Settings
+dashboard:
+  refresh_rate: 30  # seconds
+  max_chart_points: 100
+  default_timerange: "24h"
+  
+  # Theme settings
+  theme:
+    primary_color: "#007bff"
+    success_color: "#28a745"
+    warning_color: "#ffc107"
+    danger_color: "#dc3545"
+    
+  # Chart settings
+  charts:
+    performance:
+      type: "line"
+      height: 400
+      animation: true
+    
+    allocation:
+      type: "doughnut" 
+      height: 300
+      animation: true
+
+# Database Settings
+database:
+  sqlite_path: "data/dashboard.db"
+  backup_enabled: true
+  backup_interval: "24h"
+  retention_days: 90
+
+# Security Settings
+security:
+  api_key_enabled: false
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+  
+  # HTTPS settings (for production)
+  ssl:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+# Logging Settings
+logging:
+  level: "INFO"
+  file_path: "logs/dashboard.log"
+  max_file_size: "10MB"
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

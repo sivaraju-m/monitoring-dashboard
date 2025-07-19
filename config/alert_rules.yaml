@@ -1,0 +1,189 @@
+# Alert Rules Configuration
+rules:
+  # Performance Alerts
+  - name: "High Daily Loss"
+    condition: "daily_pnl < -10000"
+    severity: "high"
+    enabled: true
+    description: "Triggered when daily P&L exceeds ₹10,000 loss"
+    cooldown: 3600  # 1 hour cooldown
+    
+  - name: "Extreme Daily Loss" 
+    condition: "daily_pnl < -25000"
+    severity: "critical"
+    enabled: true
+    description: "Triggered when daily P&L exceeds ₹25,000 loss"
+    cooldown: 1800  # 30 minutes cooldown
+    
+  - name: "Low Win Rate"
+    condition: "win_rate < 40"
+    severity: "medium"
+    enabled: true
+    description: "Triggered when win rate falls below 40%"
+    cooldown: 7200  # 2 hours cooldown
+    
+  - name: "Strategy Underperformance"
+    condition: "strategy_pnl < -5000"
+    severity: "medium"
+    enabled: true
+    description: "Triggered when individual strategy loses more than ₹5,000"
+    cooldown: 3600
+    
+  # System Health Alerts
+  - name: "System Offline"
+    condition: "system_status != 'online'"
+    severity: "critical"
+    enabled: true
+    description: "Triggered when system status is not online"
+    cooldown: 300  # 5 minutes cooldown
+    
+  - name: "High CPU Usage"
+    condition: "cpu_usage > 90"
+    severity: "high"
+    enabled: true
+    description: "Triggered when CPU usage exceeds 90%"
+    cooldown: 1800
+    
+  - name: "High Memory Usage"
+    condition: "memory_usage > 85"
+    severity: "high"
+    enabled: true
+    description: "Triggered when memory usage exceeds 85%"
+    cooldown: 1800
+    
+  - name: "Low Disk Space"
+    condition: "disk_usage > 90"
+    severity: "high"
+    enabled: true
+    description: "Triggered when disk usage exceeds 90%"
+    cooldown: 3600
+    
+  # Data Quality Alerts
+  - name: "Data Pipeline Error"
+    condition: "data_quality != 'good'"
+    severity: "medium"
+    enabled: true
+    description: "Triggered when data quality is poor"
+    cooldown: 1800
+    
+  - name: "Stale Data"
+    condition: "last_data_update_hours > 2"
+    severity: "medium"
+    enabled: true
+    description: "Triggered when data hasn't been updated for 2+ hours"
+    cooldown: 3600
+    
+  # Trading Alerts
+  - name: "No Trading Activity"
+    condition: "total_trades == 0"
+    severity: "low"
+    enabled: true
+    description: "Triggered when no trades executed in a day"
+    cooldown: 7200
+    
+  - name: "High Drawdown"
+    condition: "max_drawdown < -15"
+    severity: "high"
+    enabled: true
+    description: "Triggered when max drawdown exceeds 15%"
+    cooldown: 3600
+    
+  - name: "Strategy Correlation Alert"
+    condition: "strategy_correlation > 0.8"
+    severity: "medium"
+    enabled: true
+    description: "Triggered when strategy correlation is too high"
+    cooldown: 7200
+
+# Notification Configuration
+notifications:
+  email:
+    enabled: false
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    use_tls: true
+    username: ""
+    password: ""
+    from_address: "ai-trading@example.com"
+    recipients:
+      - "trader@example.com"
+      - "risk@example.com"
+    
+    # Email templates
+    templates:
+      high_severity: |
+        Subject: 🚨 HIGH ALERT: {alert_type}
+        
+        Alert: {alert_type}
+        Severity: {severity}
+        Time: {timestamp}
+        Message: {message}
+        
+        Please review immediately.
+        
+        AI Trading Machine Dashboard
+      
+      critical_severity: |
+        Subject: 🔴 CRITICAL ALERT: {alert_type}
+        
+        CRITICAL SYSTEM ALERT
+        
+        Alert: {alert_type}
+        Severity: {severity}
+        Time: {timestamp}
+        Message: {message}
+        
+        IMMEDIATE ACTION REQUIRED
+        
+        AI Trading Machine Dashboard
+  
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#trading-alerts"
+    username: "AI Trading Bot"
+    icon_emoji: ":robot_face:"
+    
+    # Slack message templates
+    templates:
+      default: |
+        :warning: *{severity}* Alert: {alert_type}
+        
+        *Message:* {message}
+        *Time:* {timestamp}
+        *Source:* {source}
+        
+        <{dashboard_url}|View Dashboard>
+      
+      critical: |
+        :rotating_light: *CRITICAL ALERT* :rotating_light:
+        
+        *Alert:* {alert_type}
+        *Message:* {message}
+        *Time:* {timestamp}
+        
+        <!channel> Immediate attention required!
+        
+        <{dashboard_url}|View Dashboard>
+
+# Alert Processing Settings
+processing:
+  max_alerts_per_minute: 10
+  duplicate_suppression: true
+  escalation:
+    enabled: true
+    escalation_time: 1800  # 30 minutes
+    escalation_severity_increase: 1
+  
+  # Alert grouping
+  grouping:
+    enabled: true
+    time_window: 300  # 5 minutes
+    max_group_size: 5
+
+# Alert Storage Settings
+storage:
+  retention_days: 30
+  archive_enabled: true
+  archive_path: "data/alerts_archive"
+  compression: true

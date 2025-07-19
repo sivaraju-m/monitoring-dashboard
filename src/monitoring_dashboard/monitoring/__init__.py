@@ -1,7 +1,8 @@
 """
-Monitoring package for the monitoring dashboard.
+Monitoring package for metrics collection and system health
 """
 
-from monitoring_dashboard.monitoring.system_monitor import SystemMonitor, system_monitor
+from .metrics_collector import MetricsCollector
+from .system_monitor import SystemMonitor, system_monitor
 
-__all__ = ["SystemMonitor", "system_monitor"]
+__all__ = ["MetricsCollector", "SystemMonitor", "system_monitor"]
