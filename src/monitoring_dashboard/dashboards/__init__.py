@@ -13,6 +13,7 @@ try:
         MonitoringMetrics,
         TradingKillSwitch,
     )
+
     _advanced_available = True
 except ImportError:
     _advanced_available = False
@@ -21,7 +22,7 @@ if _advanced_available:
     __all__ = [
         "StrategyDashboard",
         "AdvancedMonitoring",
-        "CircuitBreaker", 
+        "CircuitBreaker",
         "CircuitBreakerState",
         "MonitoringMetrics",
         "TradingKillSwitch",

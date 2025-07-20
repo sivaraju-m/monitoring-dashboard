@@ -32,41 +32,43 @@ from monitoring_dashboard.reports.performance_reporter import PerformanceReporte
 from monitoring_dashboard.utils.logger import setup_logger
 from monitoring_dashboard.utils.config_loader import ConfigLoader
 
+
 class DashboardServer:
     """Real-time monitoring dashboard server"""
-    
+
     def __init__(self):
         self.logger = setup_logger(__name__)
         self.config = ConfigLoader().load_dashboard_config()
-        
+
         # Initialize components
         self.metrics_collector = MetricsCollector()
         self.strategy_dashboard = StrategyDashboard()
         self.alert_manager = AlertManager()
         self.performance_reporter = PerformanceReporter()
-        
+
         # WebSocket connections
         self.active_connections: List[WebSocket] = []
-        
+
         # FastAPI app
         self.app = FastAPI(
             title="AI Trading Machine - Monitoring Dashboard",
             description="Real-time monitoring dashboard for trading strategies",
-            version="1.0.0"
+            version="1.0.0",
         )
-        
+
         self._setup_routes()
         self._setup_websocket()
-        
+
         self.logger.info("Dashboard server initialized")
-    
+
     def _setup_routes(self):
         """Setup HTTP routes"""
-        
+
         @self.app.get("/", response_class=HTMLResponse)
         async def dashboard_home(request: Request):
             """Main dashboard page"""
-            return HTMLResponse("""
+            return HTMLResponse(
+                """
             <!DOCTYPE html>
             <html>
             <head>
@@ -300,8 +302,9 @@ class DashboardServer:
                 </script>
             </body>
             </html>
-            """)
-        
+            """
+            )
+
         @self.app.get("/api/dashboard-data")
         async def get_dashboard_data():
             """Get current dashboard data"""
@@ -311,62 +314,62 @@ class DashboardServer:
             except Exception as e:
                 self.logger.error(f"Error collecting dashboard data: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
-        
+
         @self.app.get("/api/health")
         async def health_check():
             """Health check endpoint"""
             return {
                 "status": "healthy",
                 "timestamp": datetime.now().isoformat(),
-                "version": "1.0.0"
+                "version": "1.0.0",
             }
-    
+
     def _setup_websocket(self):
         """Setup WebSocket for real-time updates"""
-        
+
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
             await websocket.accept()
             self.active_connections.append(websocket)
-            
+
             try:
                 while True:
                     # Send real-time updates every 30 seconds
                     await asyncio.sleep(30)
                     data = await self._collect_dashboard_data()
                     await websocket.send_text(json.dumps(data))
-                    
+
             except WebSocketDisconnect:
                 self.active_connections.remove(websocket)
                 self.logger.info("WebSocket connection closed")
-    
+
     async def _collect_dashboard_data(self) -> Dict[str, Any]:
         """Collect all dashboard data"""
         try:
             # Collect metrics
             metrics = await self.metrics_collector.get_current_metrics()
-            
+
             # Get performance data
             performance = await self.strategy_dashboard.get_performance_data()
-            
+
             # Get strategy allocation
             allocation = await self.strategy_dashboard.get_allocation_data()
-            
+
             # Get strategy details
             strategies = await self.strategy_dashboard.get_strategy_summary()
-            
+
             # Get recent alerts
             alerts = await self.alert_manager.get_recent_alerts()
-            
+
             return {
                 "metrics": metrics,
                 "performance": performance,
                 "allocation": allocation,
                 "strategies": strategies,
                 "alerts": alerts,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
-            
+
         except Exception as e:
             self.logger.error(f"Error collecting dashboard data: {e}")
             return {
@@ -375,43 +378,37 @@ class DashboardServer:
                 "allocation": {},
                 "strategies": [],
                 "alerts": [],
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
-    
+
     async def broadcast_update(self, data: Dict[str, Any]):
         """Broadcast update to all connected WebSocket clients"""
         if self.active_connections:
             message = json.dumps(data)
             disconnected = []
-            
+
             for connection in self.active_connections:
                 try:
                     await connection.send_text(message)
                 except Exception as e:
                     self.logger.warning(f"Failed to send WebSocket message: {e}")
                     disconnected.append(connection)
-            
+
             # Remove disconnected connections
             for connection in disconnected:
                 if connection in self.active_connections:
                     self.active_connections.remove(connection)
-    
+
     def run(self, host: str = "0.0.0.0", port: int = 8000):
         """Run the dashboard server"""
         self.logger.info(f"Starting dashboard server on {host}:{port}")
-        
+
         # Start background tasks
         asyncio.create_task(self._background_tasks())
-        
+
         # Run server
-        uvicorn.run(
-            self.app,
-            host=host,
-            port=port,
-            log_level="info",
-            access_log=True
-        )
-    
+        uvicorn.run(self.app, host=host, port=port, log_level="info", access_log=True)
+
     async def _background_tasks(self):
         """Background tasks for periodic updates"""
         while True:
@@ -420,32 +417,33 @@ class DashboardServer:
                 await asyncio.sleep(30)
                 data = await self._collect_dashboard_data()
                 await self.broadcast_update(data)
-                
+
             except Exception as e:
                 self.logger.error(f"Error in background task: {e}")
                 await asyncio.sleep(60)  # Wait longer on error
 
+
 def main():
     """Main entry point"""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="AI Trading Machine Dashboard Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     # Create and run server
     server = DashboardServer()
     server.run(host=args.host, port=args.port)
+
 
 if __name__ == "__main__":
     main()

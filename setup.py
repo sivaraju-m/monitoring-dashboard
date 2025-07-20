@@ -16,7 +16,7 @@ setup(
         "google-cloud-monitoring>=2.0.0",
         "google-cloud-monitoring-dashboards>=2.0.0",
         "google-cloud-pubsub>=2.0.0",
-        "google-cloud-storage>=2.0.0"
+        "google-cloud-storage>=2.0.0",
     ],
     author="AI Trading Machine Team",
     author_email="team@aitradingmachine.com",

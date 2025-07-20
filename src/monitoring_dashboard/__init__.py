@@ -15,10 +15,10 @@ from .utils.config_loader import ConfigLoader
 
 __all__ = [
     "MetricsCollector",
-    "StrategyDashboard", 
+    "StrategyDashboard",
     "AlertManager",
     "PerformanceReporter",
     "setup_logger",
     "DashboardLogger",
-    "ConfigLoader"
+    "ConfigLoader",
 ]
